@@ -1,0 +1,443 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<!DOCTYPE rfc SYSTEM "rfc2629.dtd" [
+<!-- One method to get references from the online citation libraries.
+     There has to be one entity for each item to be referenced. 
+     An alternate method (rfc include) is described in the references. -->
+
+<!ENTITY RFC2119 SYSTEM "http://xml.resource.org/public/rfc/bibxml/reference.RFC.2119.xml">
+<!ENTITY I-D.draft-ietf-sfc-nsh SYSTEM
+"http://xml.resource.org/public/rfc/bibxml3/reference.I-D.draft-ietf-sfc-nsh-02.xml">
+<!ENTITY RFC7665 SYSTEM "http://xml.resource.org/public/rfc/bibxml/reference.RFC.7665.xml">
+]>
+<?xml-stylesheet type='text/xsl' href='rfc2629.xslt' ?>
+<!-- used by XSLT processors -->
+<!-- For a complete list and description of processing instructions (PIs), 
+     please see http://xml.resource.org/authoring/README.html. -->
+<!-- Below are generally applicable Processing Instructions (PIs) that most I-Ds might want to use.
+     (Here they are set differently than their defaults in xml2rfc v1.32) -->
+<?rfc strict="yes" ?>
+<!-- give errors regarding ID-nits and DTD validation -->
+<!-- control the table of contents (ToC) -->
+<?rfc toc="yes"?>
+<!-- generate a ToC -->
+<?rfc tocdepth="4"?>
+<!-- the number of levels of subsections in ToC. default: 3 -->
+<!-- control references -->
+<?rfc symrefs="yes"?>
+<!-- use symbolic references tags, i.e, [RFC2119] instead of [1] -->
+<?rfc sortrefs="yes" ?>
+<!-- sort the reference entries alphabetically -->
+<!-- control vertical white space 
+     (using these PIs as follows is recommended by the RFC Editor) -->
+<?rfc compact="yes" ?>
+<!-- do not start each main section on a new page -->
+<?rfc subcompact="no" ?>
+<!-- keep one blank line between list items -->
+<!-- end of list of popular I-D processing instructions -->
+<rfc category="info" docName="draft-dolson-sfc-nfv-patterns-00" ipr="trust200902">
+
+  <!-- ***** FRONT MATTER ***** -->
+
+  <front>
+
+    <title abbrev="Efficient Patterns for SFC within NFVI">
+	Efficient Patterns for Service Function Chaining within Network Function Virtualization Infrastructure
+	</title>
+
+    <!-- add 'role="editor"' below for the editors if appropriate -->
+
+    <author fullname="David Dolson" initials="D." surname="Dolson">
+      <organization>Sandvine</organization>
+      <address>
+        <postal>
+          <street>408 Albert Street</street>
+          <city>Waterloo</city>
+          <region>ON</region>
+          <code>N2L 3V3</code>
+          <country>Canada</country>
+        </postal>
+        <phone>+1 519 880 2400</phone>
+        <email>ddolson@sandvine.com</email>
+      </address>
+    </author>
+    <author fullname="Michael Marchetti" initials="M." surname="Marchetti">
+      <organization>Sandvine</organization>
+      <address>
+        <postal>
+          <street>408 Albert Street</street>
+          <city>Waterloo</city>
+          <region>ON</region>
+          <code>N2L 3V3</code>
+          <country>Canada</country>
+        </postal>
+        <phone>+1 519 880 2400</phone>
+        <email>mmarchetti@sandvine.com</email>
+      </address>
+    </author>
+    <author fullname="Kyle Larose" initials="K." surname="Larose">
+      <organization>Sandvine</organization>
+      <address>
+        <postal>
+          <street>408 Albert Street</street>
+          <city>Waterloo</city>
+          <region>ON</region>
+          <code>N2L 3V3</code>
+          <country>Canada</country>
+        </postal>
+        <phone>+1 519 880 2400</phone>
+        <email>klarose@sandvine.com</email>
+      </address>
+    </author>
+
+    <date year="2016" />
+
+    <!-- Meta-data Declarations -->
+
+    <area>Routing Area</area>
+
+    <workgroup>Service Function Chaining</workgroup>
+
+    <keyword>sfc</keyword>
+    <keyword>nfv</keyword>
+
+    <abstract>
+      <t>
+        The document presents some considerations for efficiently
+        deploying Service Function Chaining (SFC) within a
+	Network Function Virtualization Infrastructure (NFVI). 
+      </t>
+    </abstract>
+  </front>
+
+  <middle>
+    <section title="Introduction">
+      <t>
+        Service Function Chaining (SFC) is a technique for prescribing 
+        differentiated traffic forwarding policies.
+        SFC is described in detail in the
+        <xref target="RFC7665">
+         SFC architecture document
+        </xref>,
+        and is not repeated here.
+      </t>
+      <t>
+        Network Function Virtualization (NFV) is technology for deploying
+        network forwarding software functions on an infrastructure
+        providing generic compute and network resources. Such an
+        infrastructure is termed NFVI <xref target="ETSI_NFV"/>.
+      </t>
+      <t>
+        This document presents some efficient patterns for deploying SFC within
+        an NFVI, in the hope of sharing good practices.
+      </t>
+
+      <section title="Requirements Language">
+        <t>The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+        "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
+        document are to be interpreted as described in <xref
+        target="RFC2119">RFC 2119</xref>.</t>
+      </section>
+    </section>
+
+    <section title="Objectives">
+      <t>
+        The patterns described in this document are designed to
+	satisfy:
+	<list style="symbols">
+	  <t>Minimize latency by minimizing both the number of 
+	     physical hops and number of queues each packet
+	     traversing a service chain must undergo.</t>
+	  <t>Minimize CPU processing by avoiding unnecessary
+	     software switching.</t>
+	</list>
+      </t>
+	<t>These objectives serve both to increase network
+	 performance that would be measured by end users
+	 and increase efficiency of NFVI by minimizing
+	 switching and CPU resources required to implement
+	 each chain.</t>
+    </section>
+	
+    <section title="Assumptions">
+        <t> We wish to discuss solutions that are available with
+            current technology. In particular:
+        <list style="symbols">
+	  <t> the NFVI is to be built using only currently available
+	      commercial off-the-shelf (COTS) hardware;</t>
+	  <t> the infrastructure is to be built using currently available NFVI technology
+	      and hosting, in particular the ability of the NFV
+              infrastructure to provide virtual compute resources
+              with interfaces to virtual Ethernet LAN segments.</t>
+	</list>
+        </t>
+    </section> <!-- Assumptions -->
+	
+    <section title="Patterns">
+
+      <t>The following sections describe design patterns for using SFC that we
+         consider to be appropriate under the above NFV assumptions.</t>
+	
+    <section title="Use MAC-NSH to address functions"
+             anchor="section_mac_nsh">
+      <t>
+        A common infrastructure model (e.g., OpenStack/Neutron) <!-- FIXME reference -->
+        allows provisioning of virtual
+        machines with interfaces on specified Ethernet segments.
+        Although the physical implementation of an Ethernet segment is opaque
+        to the tenants, all machines on a segment can send packets
+        to one another by addressing the destination MAC address.
+      </t>
+      <t>
+        Single-Root I/O Virtualization (SR-IOV) is a technology that
+        allows a single physical interface on a 
+        compute host to be split into multiple virtual interfaces such that
+        each guest has a hardware interface to the network.
+        <!--FIXME reference SR-IOV, also KVM commands to do it-->
+        When so configured, the
+        physical interface hardware sorts incoming packets into queues for the distinct emulated
+        interfaces according to destination MAC addresses. This technology removes
+        any need for a software module to sort packets received from the physical interfaces into
+        virtual interfaces of the guests. Thus, an extra queuing stage is avoided
+        and no CPU switching resources are required. <!--FIXME: reference VIRTIO in contrast?-->
+      </t>
+      <t>The NVFI operator may choose to deploy simple switching, with 
+         hardware backplane and top-of-rack Ethernet/VLAN switches providing
+         minimum latency.
+         The operator may also deploy Ethernet-over-IP (e.g., VXLAN)
+         when functions are remote. In any case, the virtual host is
+         agnostic to the implementation.
+      </t>
+      <t>
+        Thus, by using SR-IOV and efficient zero-copy drivers, functions 
+        naturally address one another by MAC address on the layer-2 segment.
+        In the optimal NFV scenario,
+        software in one function queues packets to an outbound SR-IOV queue,
+        hardware sends the packet on the physical interface, backplane
+        or top-of-rack switches deliver the packet to the physical 
+        destination and SR-IOV destination queue. There need not be any
+        software between functions, only Ethernet switches.
+      </t>
+      <t>
+        Note that to capture the benefit of using SR-IOV to avoid
+	software switching, any L2-over-L3 (e.g., VXLAN) should be
+	arranged for in hardware. The functions themselves can then behave the
+	same whether virtual or physical network segments are used.
+      </t>
+      <t>
+        We conclude that carrying NSH packets directly within Ethernet
+        frames is an efficient and natural way to implement Service Function
+        Chaining.
+        The Ethernet encapsulation of NSH is documented in
+        <xref target="I-D.ietf-sfc-nsh"/>.
+      </t>
+    </section>
+
+    <section title="Locate SFF with the SF"
+             anchor="section_sff_sf">
+      <t>
+        Service function chains are often drawn like this two-SF example
+        in which a packet goes from ingress to Classifier, to SFF1,
+        to SF1, back to SFF1, to SFF2, to SF2, back to SF2 and finally
+        to egress:
+      <figure anchor="fig_two_sf_simple"
+              title="A conceptual service function chain">
+	  <artwork><![CDATA[
+ingress --> Classifier --> SFF1 --> SFF2 --> Egress
+                            ^         ^
+                            |         |
+                            |         |
+                            V         V
+                           SF1       SF2
+      ]]></artwork></figure>
+      </t>
+      <t>
+        But in NFV infrastructure, if SFFs are considered distinct processing
+        elements, the common reality is that each of the components
+        are separated by Ethernet switching:
+      </t>
+      <figure anchor="fig_two_sf_real"
+              title="A service function chain showing switches">
+	   <artwork><![CDATA[
+ingress-->Classifier-->switch-->SFF1-->switch-->SFF2-->switch-->Egress
+                                 ^               ^
+                                 |               |
+                                 |               |
+                                 V               V
+                              switch           switch
+                                 ^               ^
+                                 |               |
+                                 |               |
+                                 V               V
+                                SF1             SF2
+      ]]></artwork></figure>
+      <t> In an NFV environment, the "switch" blocks in <xref target="fig_two_sf_real"/>
+          can be implemented by Ethernet backplane, top-of-rack switching or (for
+          remotely separated virtual machines) VXLAN virtual layer-2 network. </t>
+      <t> There is an optimization that can be made when
+          all of the "switch" modules are the same Ethernet switching
+          domain. In other words, when this is the logical topology
+          of <xref target="fig_two_sf_topology"/>:</t>
+      <figure anchor="fig_two_sf_topology"
+              title="Service chain components attached to a layer-2 network">
+          <artwork><![CDATA[
+                        SFF1    SFF2
+                           |    |
+                           |    |
+ingress ---Classifier----- switch ---------- egress
+                           |    |
+                           |    |
+                         SF1    SF2
+      ]]></artwork></figure>
+      <t>Notice that to implement the path of <xref target="fig_two_sf_simple"/>
+         and <xref target="fig_two_sf_real"/>,
+         a packet must pass through the switch seven times.
+	 It must also pass through each SFF twice, limiting the capacity
+	 of an SFF.</t>
+      <t>We can reduce the number of transits through the switch by placing SFF
+         forwarding tables in the SF software module itself, like this:</t>
+      <figure anchor="fig_combo"
+              title="SFFs embedded in SF machines">
+          <artwork><![CDATA[
+ingress ---Classifier----- switch ---------- egress
+                           |    |
+                           |    |
+                        SFF1    SFF2
+                         SF1    SF2
+      ]]></artwork></figure>
+      <t>In this case, a packet taking the path of <xref target="fig_two_sf_simple"/>
+         only transits the switch three times. For minimal latency, an
+	 implementation can avoid queuing between the SF and attached SFF.</t>
+
+      <t>Although keeping the SFFs distinct from the SFs has an architectural
+         purity, the purity has a big cost in switching throughput 
+	 and corresponding cost in money and latency. Since each packet
+	 enters and exits each SFF twice, there could also be contention on
+	 the SFF interfaces.</t>
+
+      <t> There is additional control-plane burden to achieve this data-plane
+          efficiency gain:
+          <list style="symbols">
+            <t> SF software must implement SFF lookup functions.
+                We feel this computation of next-hop and packet formatting
+                can be done efficienty in software, but it does require
+                support of the SFF feature in the software.</t>
+            <t> There will be as many SFFs as SFs,
+                each of which much have correct forwarding entries
+                populated by the control plane during the orchestration
+                of bringing an SF on line.</t>
+          </list>
+      </t>
+
+
+      <t> There are many ways to physically realize the logical switch entities
+          in <xref target="fig_two_sf_topology"/> and <xref target="fig_combo"/>.
+	  The best case is a hardware Ethernet switch; considerations about
+	  how to optimally deploy functions are discussed elsewhere, e.g., in
+          Network Function Virtualization Research Group (NFVRG).
+	  In any of these cases, reducing the number of passages though the
+	  switch will reduce latency and reduce operational cost.
+	  </t>
+
+
+    </section>
+
+    <section title="Prefer NSH MD Type 2">
+      <t> The NSH draft <xref target="I-D.ietf-sfc-nsh"/> defines two
+          options for metadata, types 1 and 2. Type 2 is more efficient
+	  when there is no metadata, and is the only choice supporting
+	  more than 128 bits of metadata.</t>
+      <t> Using the approaches described in 
+          <xref target="section_mac_nsh"/>
+	  and <xref target="section_sff_sf"/>,
+          NSH packets are transported from one MAC endpoint to another
+	  via standard Ethernet switches, so there are no requirements
+	  on the NFV Infrastructure to support NSH. </t>
+      <t> Given that parsing the variable-length header poses no
+          concerns for software, we feel these considerations make
+	  MD Type 2 the preferred choice
+          for service chaining with NFV. </t>
+
+    </section>
+
+    </section> <!-- Patterns -->
+    
+
+    
+
+    
+<!--
+    <section anchor="Acknowledgements" title="Acknowledgements">
+      <t>
+      </t>
+      <t>
+        The authors would like to thank the following individuals for taking the
+        time to read and provide valuable feedback:
+      </t>
+      <t>
+        <list style="hanging">
+          <t> </t>
+        </list>
+      </t>
+    </section>
+-->
+
+    <!-- Possibly a 'Contributors' section ... -->
+
+    <section anchor="IANA" title="IANA Considerations">
+      <t>This memo includes no request to IANA.</t>
+    </section>
+
+    <section anchor="Security" title="Security Considerations">
+      <t>
+        We are not aware of any additional security concerns raised
+        by employing the methods discussed in this memo.
+      </t>
+      <t>
+        The MAC-NSH approach assumes security of (virtual) LAN
+        segments.
+      </t>
+      <t>
+        Employing SFF functionality within Service Function software
+        puts trust in that software, but SF functions must in any case
+        be trusted to return packets to the correct path.
+      </t>
+    </section>
+  </middle>
+
+  <!--  *****BACK MATTER ***** -->
+
+  <back>
+
+    <references title="Normative References">
+      &RFC2119;
+
+
+    </references>
+
+    <references title="Informative References">
+
+      &I-D.draft-ietf-sfc-nsh;
+
+      &RFC7665;
+
+      <reference anchor="ETSI_NFV"
+                 target="http://www.etsi.org/deliver/etsi_gs/NFV/001_099/002/01.01.01_60/gs_NFV002v010101p.pdf">
+        <front>
+	  <title>Network Functions Virtualization (NFV); Architectural Framework</title>
+	  <author><organization>ETSI</organization></author>
+	  <date year="2013" month="October"/>
+        </front>
+      </reference>
+
+    </references>
+
+    <!-- Appendix -->
+<!--
+    <section title="">
+      <t>
+      </t>
+    </section>
+-->
+
+  </back>
+</rfc>
